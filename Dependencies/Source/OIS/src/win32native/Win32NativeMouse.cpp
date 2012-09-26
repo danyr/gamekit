@@ -35,7 +35,8 @@ Win32NativeMouse::Win32NativeMouse(InputManager *creator, bool buffered, bool gr
 	mLastX(0), mLastY(0), 
 	mMouseInit(false), mMouseMoved(false),
 	mGrab(grab), mDoGrab(grab),
-	mHide(hide), mDoHide(hide)
+	mHide(hide), mDoHide(hide),
+	mHandle(0)
 {
 }
 
@@ -100,6 +101,12 @@ void Win32NativeMouse::capture()
 	// clear previous states
 	mState.X.rel = mState.Y.rel = mState.Z.rel = 0;
 
+	if (!mMouseInit && mHandle && ::GetFocus() == mHandle)
+	{
+		RECT rect;
+		::GetWindowRect(mHandle, &rect);
+		::SetCursorPos(rect.left + (rect.right - rect.left) / 2, rect.top + (rect.bottom - rect.top) / 2);
+	}
 
 	if (!mEvents.empty())
 	{
@@ -151,7 +158,7 @@ void Win32NativeMouse::capture()
 				if (mListener && mBuffered )
 				{
 					MouseEvent arg(this, mState);
-					if (mListener->mouseMoved(arg))
+					if (mListener->mouseMoved(arg) == false)
 						break;
 				}
 			}
@@ -163,7 +170,7 @@ void Win32NativeMouse::capture()
 				if (mListener && mBuffered )
 				{
 					MouseEvent arg(this, mState);
-					if (mListener->mouseMoved(arg))
+					if (mListener->mouseMoved(arg) == false)
 						break;
 				}
 			}
@@ -174,7 +181,7 @@ void Win32NativeMouse::capture()
 				if (mListener && mBuffered )
 				{
 					MouseEvent arg(this, mState);
-					if (mListener->mouseReleased(arg, (MouseButtonID)evt.button))
+					if (mListener->mouseReleased(arg, (MouseButtonID)evt.button) == false)
 						break;
 				}
 			}
@@ -185,7 +192,7 @@ void Win32NativeMouse::capture()
 				if (mListener && mBuffered )
 				{
 					MouseEvent arg(this, mState);
-					if (mListener->mousePressed(arg, (MouseButtonID)evt.button))
+					if (mListener->mousePressed(arg, (MouseButtonID)evt.button) == false)
 						break;
 				}
 			}

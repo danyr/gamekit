@@ -1,3 +1,9 @@
+// experimental fix for clang-compiler and its inline issue
+// see: http://code.google.com/p/gamekit/issues/detail?id=222
+#ifdef __clang__
+#define ZZIP_inline
+#endif
+
 #ifndef _ZZIP__CONFIG_H
 #define _ZZIP__CONFIG_H 1
  
@@ -52,6 +58,10 @@
 /* #undef HAVE_NDIR_H */
 
 /* Define to 1 if you have the <stdint.h> header file. */
+#ifdef __ANDROID__
+//#define ZZIP_HAVE_STDINT_H  1
+#endif
+
 #ifndef ZZIP_HAVE_STDINT_H 
 /*#define ZZIP_HAVE_STDINT_H  1 */
 #endif

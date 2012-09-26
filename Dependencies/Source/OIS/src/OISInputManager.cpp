@@ -24,22 +24,25 @@ restrictions:
 #include "OISException.h"
 #include "OISFactoryCreator.h"
 #include "OISObject.h"
+#include "OISSettings.h"
 #include <sstream>
 #include <algorithm>
 
 //Bring in correct Header / InputManager for current build platform
 #if defined OIS_SDL_PLATFORM
 #  include "SDL/SDLInputManager.h"
-#elif defined OIS_WIN32_PLATFORM
-# if defined OIS_WIN32_NATIVE
+#elif defined OIS_WIN32_NATIVE
 #  include "win32native/Win32NativeInputManager.h"
-# else
+#elif defined OIS_WIN32_PLATFORM
 #  include "win32/Win32InputManager.h"
-# endif
+#elif defined OIS_ANDROID_PLATFORM
+#  include "android/AndroidInputManager.h"
 #elif defined OIS_LINUX_PLATFORM
 #  include "linux/LinuxInputManager.h"
 #elif defined OIS_APPLE_PLATFORM
 #  include "mac/MacInputManager.h"
+#elif defined OIS_IPHONE_PLATFORM
+#  include "iphone/iPhoneInputManager.h"
 #elif defined OIS_XBOX_PLATFORM
 #  include "xbox/XBoxInputManager.h"
 #endif
@@ -52,6 +55,8 @@ restrictions:
 #  include "win32/extras/WiiMote/OISWiiMoteFactoryCreator.h"
 #endif
 
+#include "OISLog.h"
+
 
 using namespace OIS;
 
@@ -62,6 +67,8 @@ InputManager::InputManager(const std::string& name) :
 	m_lircSupport(0),
 	m_wiiMoteSupport(0)
 {
+    mFactories.clear();
+    mFactoryObjects.clear();
 }
 
 //----------------------------------------------------------------------------//
@@ -106,18 +113,20 @@ InputManager* InputManager::createInputSystem( ParamList &paramList )
 
 #if defined OIS_SDL_PLATFORM
 	im = new SDLInputManager();
-#elif defined OIS_WIN32_PLATFORM
-# if defined OIS_WIN32_NATIVE
+#elif defined OIS_WIN32_NATIVE
 	im = new Win32NativeInputManager();
-# else
+#elif defined OIS_WIN32_PLATFORM
 	im = new Win32InputManager();
-# endif
 #elif defined OIS_XBOX_PLATFORM
 	im = new XBoxInputManager();
+#elif defined OIS_ANDROID_PLATFORM
+	im = new AndroidInputManager();
 #elif defined OIS_LINUX_PLATFORM
 	im = new LinuxInputManager();
 #elif defined OIS_APPLE_PLATFORM
 	im = new MacInputManager();
+#elif defined OIS_IPHONE_PLATFORM
+	im = new iPhoneInputManager();
 #else
 	OIS_EXCEPT(E_General, "No platform library.. check build platform defines!");
 #endif 
@@ -203,7 +212,9 @@ Object* InputManager::createInputObject( Type iType, bool bufferMode, const std:
 	}
 
 	if(!obj)
+	{
 		OIS_EXCEPT(E_InputDeviceNonExistant, "No devices match requested type.");
+	}
 
 	try
 	{	//Intialize device

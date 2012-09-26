@@ -24,6 +24,8 @@ restrictions:
 	http://gamekit.googlecode.com/
 */
 #include <assert.h>
+#include <stdlib.h>
+#include <map>
 #include "win32native/Win32NativeInputManager.h"
 #include "win32native/Win32NativeKeyboard.h"
 #include "win32native/Win32NativeMouse.h"
@@ -32,36 +34,39 @@ restrictions:
 using namespace OIS;
 
 
-//-------------------------------------------------------------//
-// No access to multiple GWLP_USERDATA so only one instance! 
-// ...(or HWND lookups with maps)
-static Win32NativeInputManager *gMgr= 0;
+//GWLP_USERDATA is used by Ogre WindowEventUtilities.
+typedef std::map<HWND, Win32NativeInputManager*> Win32InputMgrMap;
+static Win32InputMgrMap gMgr;
 
 
 //-------------------------------------------------------------//
 static LRESULT WINAPI OIS_SystemProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-	if (gMgr)
-		return gMgr->_proc(hWnd, msg, wParam, lParam);
+	Win32InputMgrMap::iterator i = gMgr.find(hWnd);
+	if (i != gMgr.end())
+		return i->second->_proc(hWnd, msg, wParam, lParam);
+
 	return ::DefWindowProc(hWnd, msg, wParam, lParam);
 }
 
 //-------------------------------------------------------------//
 Win32NativeInputManager::Win32NativeInputManager() :
 		OIS::InputManager("Win32NativeInputManager"),
-		mKeyboard(0), mMouse(0), mOldProc(0), mGrab(true), mHide(true)
+		mKeyboard(0), mMouse(0), mOldProc(0), mGrab(true), mHide(true), mHandle(0), mPass(false)
 {
-	if (gMgr)
-		OIS_EXCEPT(E_InvalidParam, "Win32NativeInputManager::Win32NativeInputManager >> Only one InputManager supported by this implementation");
-
-	gMgr= this;
 	mFactories.push_back(this);
 }
 
 //-------------------------------------------------------------//
 Win32NativeInputManager::~Win32NativeInputManager()
 {
-	gMgr= 0;
+	if (mHandle)
+	{
+		if (mOldProc != 0) //restore old
+			::SetWindowLongPtr(mHandle, GWL_WNDPROC, (LONG_PTR)mOldProc);
+
+		gMgr.erase(mHandle);
+	}
 }
 
 //-------------------------------------------------------------//
@@ -72,14 +77,16 @@ void Win32NativeInputManager::_initialize(ParamList &paramList)
 	if (it == paramList.end())
 		OIS_EXCEPT(E_InvalidParam, "Win32NativeInputManager::Win32NativeInputManager >> No HWND found!");
 
-	HWND hWnd= (HWND)strtoul(it->second.c_str(), 0, 10);
-	if (IsWindow(hWnd) == 0)
+	mHandle = (HWND)strtoul(it->second.c_str(), 0, 10);
+	if (IsWindow(mHandle) == 0)
 		OIS_EXCEPT(E_General, "Win32NativeInputManager::Win32NativeInputManager >> The sent HWND is not valid!");
 
 	// save old
-	mOldProc= (WNDPROC)::GetWindowLongPtr(hWnd, GWL_WNDPROC);
+	mOldProc= (WNDPROC)::GetWindowLongPtr(mHandle, GWL_WNDPROC);
 	if (!mOldProc)
 		OIS_EXCEPT(E_General, "Win32NativeInputManager::Win32NativeInputManager >> Window has no existing procedure");
+
+	gMgr[mHandle] = this;
 
 	ParamList::iterator i = paramList.begin(), e = paramList.end();
 	for( ; i != e; ++i ) 
@@ -91,12 +98,15 @@ void Win32NativeInputManager::_initialize(ParamList &paramList)
             else if (i->second == "DISCL_NONEXCLUSIVE")
 				mGrab= false;
         }
+
+		if( i->first == "w32_pass_event" )
+			mPass = true;
 	}
 
 	if (mOldProc != 0)
 	{
 		// add subclass
-		::SetWindowLongPtr(hWnd, GWL_WNDPROC, (LONG_PTR)OIS_SystemProc);
+		::SetWindowLongPtr(mHandle, GWL_WNDPROC, (LONG_PTR)OIS_SystemProc);
 	}
 }
 
@@ -120,7 +130,7 @@ LRESULT WINAPI Win32NativeInputManager::_proc(HWND hWnd, UINT msg, WPARAM wParam
 		if (mMouse != 0)
 		{
 			mMouse->handleMouse(hWnd, msg, wParam, lParam);
-			return 0;
+			if (!mPass) return 0;
 		}
 		break;
 	case WM_SYSKEYUP:
@@ -130,7 +140,7 @@ LRESULT WINAPI Win32NativeInputManager::_proc(HWND hWnd, UINT msg, WPARAM wParam
 		if (mKeyboard)
 		{
 			mKeyboard->handleKey(msg, wParam, lParam);
-			return 0;
+			if (!mPass) return 0;
 		}
 		break;
 	}
@@ -183,7 +193,10 @@ Object* Win32NativeInputManager::createObject(InputManager* creator, Type iType,
 		break;
 	case OISMouse:
 		if (!mMouse)
+		{
 			ret= mMouse= new Win32NativeMouse(this, bufferMode, mGrab, mHide);
+			mMouse->_setHandle(mHandle);
+		}
 		break;
 	}
 	return ret;

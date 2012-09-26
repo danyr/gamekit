@@ -28,6 +28,7 @@ restrictions:
 #include <X11/keysym.h>
 #include <X11/Xutil.h>
 #include <cstring>
+#include <unistd.h>
 
 using namespace OIS;
 #include <iostream>
@@ -289,7 +290,7 @@ unsigned int UTF8ToUTF32(unsigned char* buf)
 }
 
 //-------------------------------------------------------------------//
-bool LinuxKeyboard::isKeyDown( KeyCode key )
+bool LinuxKeyboard::isKeyDown( KeyCode key ) const
 {
 	return (KeyBuffer[key]);
 }
@@ -443,7 +444,7 @@ const std::string& LinuxKeyboard::getAsString( KeyCode kc )
 }
 
 //-------------------------------------------------------------------//
-void LinuxKeyboard::copyKeyStates( char keys[256] )
+void LinuxKeyboard::copyKeyStates( char keys[256] ) const
 {
 	memcpy( keys, KeyBuffer, 256 );
 }

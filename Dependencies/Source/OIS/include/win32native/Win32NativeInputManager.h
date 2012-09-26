@@ -28,7 +28,7 @@ restrictions:
 
 #include "OISInputManager.h"
 #include "OISFactoryCreator.h"
-#include "win32Native/Win32NativePrereqs.h"
+#include "win32native/Win32NativePrereqs.h"
 
 
 namespace OIS
@@ -75,6 +75,7 @@ namespace OIS
 			procedure (old) to the new one defined here 
 		 */
 		WNDPROC mOldProc;
+		HWND mHandle;
 
 
 		/** Keyboard wrapper*/
@@ -83,7 +84,7 @@ namespace OIS
 		/** Mouse wrapper*/
 		class Win32NativeMouse	*mMouse;	
         bool mGrab, mHide;
-
+		bool mPass;
 	};
 }
 
