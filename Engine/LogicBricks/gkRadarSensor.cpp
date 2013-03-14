@@ -131,7 +131,7 @@ bool gkRadarSensor::query(void)
 	{
 		gkGameObject* ob = gkPhysicsController::castObject(iter.peekNext());
 
-		if (gkPhysicsController::sensorTest(ob, m_prop, m_material))
+		if (NULL!=ob && gkPhysicsController::sensorTest(ob, m_prop, m_material))
 			return true;
 
 		iter.getNext();

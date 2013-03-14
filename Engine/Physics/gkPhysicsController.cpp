@@ -465,6 +465,8 @@ gkGameObject* gkPhysicsController::castObject(btCollisionObject* colObj)
 {
 	GK_ASSERT(colObj);
 	gkPhysicsController* cont = static_cast<gkPhysicsController*>(colObj->getUserPointer());
+	if (NULL==cont)
+		return NULL;
 	GK_ASSERT(cont);
 	return cont->getObject();
 }
