@@ -56,6 +56,9 @@ public:
 
 	OIS::MultiTouch*        m_itouch;
 	OIS::JoyStick*			m_iacc;
+	OIS::JoyStick*			m_ipen3d;
+	int m_accelIdx;
+	int m_stylusIdx;
 };
 
 #endif //_gkWindowIOS_h_

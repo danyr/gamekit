@@ -40,8 +40,16 @@
 #include "OgreWindowEventUtilities.h"
 #include "OIS.h"
 
+#include <android/log.h>
+#define LOG_TAG    "danyr"
+#define LOGI(...)  __android_log_print(ANDROID_LOG_INFO,LOG_TAG,__VA_ARGS__)
+#define LOGE(...)  __android_log_print(ANDROID_LOG_ERROR,LOG_TAG,__VA_ARGS__)
+#define LOG_FOOT   LOGI("%s %s %d", __FILE__, __FUNCTION__, __LINE__)
+
 gkWindowAndroid::gkWindowAndroid()
-	:	m_itouch(0)
+	:	m_itouch(0),
+		m_accelIdx(-1),
+		m_stylusIdx(-1)
 {
 }
 
@@ -90,9 +98,24 @@ bool gkWindowAndroid::setupInput(const gkUserDefs& prefs)
 
 			gkJoystick* gkjs = new gkJoystick(0,0);
 			m_joysticks.push_back(gkjs);
+			m_accelIdx = m_joysticks.size()-1;
 		} catch (OIS::Exception&){
 			m_iacc=0;
 		}
+
+		//adding 3d stylus
+		try{
+			m_ipen3d = (OIS::JoyStick*)m_input->createInputObject(OIS::OISJoyStick, true,"us_stylus");
+			m_ipen3d->setEventCallback(this);
+			m_ijoysticks.push_back(m_ipen3d); //index 1
+
+			gkJoystick* gkjs = new gkJoystick(0,m_ipen3d->getNumberOfComponents(OIS::OIS_Axis));
+			m_joysticks.push_back(gkjs);
+			m_stylusIdx = m_joysticks.size()-1;
+		} catch (OIS::Exception&){
+			m_ipen3d=0;
+		}
+
 
 		m_itouch = (OIS::MultiTouch*)m_input->createInputObject(OIS::OISMultiTouch, true); GK_ASSERT(m_itouch);
 		m_itouch->setEventCallback(this);
@@ -117,7 +140,9 @@ void gkWindowAndroid::dispatch(void)
 		m_mouse.moved = false;
 	if(m_iacc){
 		m_iacc->capture();
-	} else {
+	}
+	if(m_ipen3d){
+		m_ipen3d->capture();
 	}
 }
 
@@ -238,22 +263,38 @@ bool gkWindowAndroid::touchMoved(const OIS::MultiTouchEvent& arg)
 }
 
 bool gkWindowAndroid::axisMoved( const OIS::JoyStickEvent &arg, int axis ){
-	const OIS::Vector3& arg_accel = arg.state.mVectors[0];
-	gkVector3& accel = m_joysticks[0]->accel;
 
-	accel.x = arg_accel.x;
-	accel.y = arg_accel.y;
-	accel.z = arg_accel.z;
-
-	if (!m_listeners.empty())
-	{
-		gkWindowSystem::Listener* node = m_listeners.begin();
-		while (node)
+	//stylus moved
+	if (arg.device && arg.device->vendor()=="us_stylus" && m_stylusIdx>=0) {
+		m_joysticks[m_stylusIdx]->axes[axis] = arg.state.mAxes[axis].abs;
+		if (!m_listeners.empty())
 		{
-			node->joystickMoved(*m_joysticks[0], 0);
-			node = node->getNext();
+			gkWindowSystem::Listener* node = m_listeners.begin();
+			while (node)
+			{
+				node->joystickMoved(*m_joysticks[m_stylusIdx], axis);
+				node = node->getNext();
+			}
 		}
 	}
+	//accel
+	else if (m_accelIdx>=0){
+		const OIS::Vector3& arg_accel = arg.state.mVectors[0];
+		gkVector3& accel = m_joysticks[m_accelIdx]->accel;
+		accel.x = arg_accel.x;
+		accel.y = arg_accel.y;
+		accel.z = arg_accel.z;
+		if (!m_listeners.empty())
+		{
+			gkWindowSystem::Listener* node = m_listeners.begin();
+			while (node)
+			{
+				node->joystickMoved(*m_joysticks[0], 0);
+				node = node->getNext();
+			}
+		}
+	}
+
 	return true;
 }
 

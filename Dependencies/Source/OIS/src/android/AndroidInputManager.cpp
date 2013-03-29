@@ -30,6 +30,15 @@ restrictions:
 #include <cstdio>
 #include "OISLog.h"
 
+#include <android/log.h>
+#define LOG_TAG    "AndroidInputManager"
+#define LOGI(...)  __android_log_print(ANDROID_LOG_INFO,LOG_TAG,__VA_ARGS__)
+#define LOGE(...)  __android_log_print(ANDROID_LOG_ERROR,LOG_TAG,__VA_ARGS__)
+#define LOG_FOOT   LOGI("%s %s %d", __FILE__, __FUNCTION__, __LINE__)
+
+#define VENDOR_US_STYLUS "us_stylus"
+
+
 namespace OIS
 {
 
@@ -37,7 +46,8 @@ AndroidInputManager::AndroidInputManager()
 	:	InputManager("AndroidInputManager"),
 		mKeyboard(0),
 		mTouch(0),
-		mAccelerometer(0)
+		mAccelerometer(0),
+		mStylus(0)
 {
 	mFactories.push_back(this);
 
@@ -73,6 +83,10 @@ DeviceList AndroidInputManager::freeDeviceList()
 		if (mAccelerometer){
 			ret.insert(std::make_pair(OISJoyStick, mInputSystemName));
 		}
+		if (mStylus){
+			ret.insert(std::make_pair(OISJoyStick, mInputSystemName));
+		}
+
 
 	return ret;
 }
@@ -83,7 +97,7 @@ int AndroidInputManager::totalDevices(Type iType)
 	{
         case OISKeyboard: return 1;
         case OISMultiTouch: return 1;
-        case OISJoyStick : return 1;
+		case OISJoyStick : return (mAccelerometer==NULL ? 0 : 1) + (mStylus==NULL ? 0 : 1);
         default: return 0;
 	}
 }
@@ -94,7 +108,7 @@ int AndroidInputManager::freeDevices(Type iType)
 	{
         case OISKeyboard: return 1; //bAccelerometerUsed ? 0 : 1;
         case OISMultiTouch: return 1; //bMultiTouchUsed ? 0 : 1;
-        case OISJoyStick : return 1;
+		case OISJoyStick : return (mAccelerometer!=NULL ? 0 : 1) + (mStylus!=NULL ? 0 : 1);
         default: return 0;
 	}
 }
@@ -102,6 +116,10 @@ int AndroidInputManager::freeDevices(Type iType)
 bool AndroidInputManager::vendorExist(Type iType, const std::string & vendor)
 {
 	if( ( iType == OISMultiTouch || iType == OISKeyboard || iType == OISJoyStick) && vendor == mInputSystemName )
+		return true;
+
+	//stylus
+	if (iType==OISJoyStick && vendor==VENDOR_US_STYLUS)
 		return true;
 
 	return false;
@@ -135,10 +153,22 @@ Object* AndroidInputManager::createObject(InputManager* creator, Type iType, boo
 		}
 	case OISJoyStick:
 		{
-			AndroidAccelerometer* accel = new AndroidAccelerometer(this,true);
-			obj = accel;
-			if (!mAccelerometer)
-				mAccelerometer = accel;
+			if (vendor==VENDOR_US_STYLUS) {
+			LOGI("Created stylus object");
+			//adding stylus as joystick
+				AndroidStylus3D* stylus = new AndroidStylus3D(this,true);
+				obj = stylus;
+				if (!mStylus)
+					mStylus = stylus;
+			}
+			else {
+				LOGI("Created AndroidAccelerometer object");
+				//adding accelerator as joystick
+				AndroidAccelerometer* accel = new AndroidAccelerometer(this,true);
+				obj = accel;
+				if (!mAccelerometer)
+					mAccelerometer = accel;
+			}
 			break;
 		}
 	default:
@@ -161,6 +191,7 @@ void AndroidInputManager::destroyObject(Object* obj)
 
 	if (obj == mTouch) mTouch = 0;
 	else if (obj == mKeyboard) mKeyboard = 0;
+	else if (obj == mStylus) mStylus = 0;
 }
 
 
@@ -529,7 +560,6 @@ void AndroidAccelerometer::setBuffered(bool buffered){
 void AndroidAccelerometer::capture(){
     mState.clear();
     mState.mVectors[0] = mTempState;
-
     if(mListener && mBuffered){
         mListener->axisMoved(JoyStickEvent(this, mState), 0);
     } 
@@ -551,4 +581,52 @@ void AndroidAccelerometer::injectAcceleration(float x,float y,float z) {
 	mTempState.y = y;
 	mTempState.z = z;
 }
+
+// ------------------- 3d stylus ----------------------------
+#define ID_STYLUS_3D 1
+#define PI_NUM 3.14
+AndroidStylus3D::AndroidStylus3D(InputManager* creator, bool buffered) : JoyStick(VENDOR_US_STYLUS, true, ID_STYLUS_3D, 0) 
+{
+
+}
+AndroidStylus3D::~AndroidStylus3D() {}
+
+/** @copydoc Object::setBuffered */
+void AndroidStylus3D::setBuffered(bool buffered){
+	mBuffered=buffered;
+}
+
+/** @copydoc Object::capture */
+void AndroidStylus3D::capture(){
+	mState.clear();
+	mState.mAxes[0].abs = (int)mTempState.x;
+	mState.mAxes[1].abs = (int)mTempState.y;
+	mState.mAxes[2].abs = (int)mTempState.z;
+	mState.mAxes[3].abs = (int)(mTempState.axisAngle / PI_NUM * 180);
+	mState.mAxes[4].abs = (int)(mTempState.stylusAngle  / PI_NUM * 180);
+
+	if(mListener && mBuffered){
+		for (int i=0;i<5;i++)
+		{
+			//TODO: report only changed axis
+			mListener->axisMoved(JoyStickEvent(this, mState), i);
+		}
+	}
+}
+
+/** @copydoc Object::_initialize */
+void AndroidStylus3D::_initialize(){
+	// Clear old joy state
+	mState.clear();
+	mState.mAxes.resize(5); // will be stylus axis  - rotation and tilt
+}
+
+void AndroidStylus3D::injectStylusEvent(float x,float y,float z,float axisAngle,float stylusAngle) {
+	mTempState.x = x;
+	mTempState.y = y;
+	mTempState.z = z;
+	mTempState.axisAngle = axisAngle;
+	mTempState.stylusAngle = stylusAngle;
+}
+
 }

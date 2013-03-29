@@ -72,6 +72,7 @@ public:
 	void injectKey(int action, int uniChar, int keyCode) { if (m_input) m_input->injectKey(action, uniChar, keyCode); }
 	void injectTouch(int action, float x, float y) { if (m_input) m_input->injectTouch(action, x, y); }
 	void injectAcceleration(float x,float y, float z) { if (m_input) m_input->injectAcceleration(x,y,z);}
+	void injectStylusEvent(float x,float y, float z,float axisAngle,float stylusAngle) { if (m_input) m_input->injectStylusEvent(x,y,z,axisAngle,stylusAngle);}
 	void setOffsets(int x, int y) { if (m_input) m_input->setOffsets(x,y); }
 	void setWindowSize(int w, int h) { if (m_input) m_input->setWindowSize(w,h); }
 	void handleMessage(gkMessageManager::Message* message);
@@ -337,6 +338,12 @@ void sendSensor(JNIEnv *env, jclass thiz, jint type, jfloat x, jfloat y, jfloat 
 	okit.injectAcceleration(x,y,z);
 }
 
+void sendStylus(JNIEnv *env, jclass thiz, jint id, jfloat x, jfloat y, jfloat z,jfloat axisAngle,jfloat stylusAngle){
+//	LOGI("Injecting stylus %d %f %f %f %f %f", __FUNCTION__, id,x, y,z,axisAngle,stylusAngle);
+	okit.injectStylusEvent(x,y,z,axisAngle,stylusAngle);
+}
+
+
 /*
  * Class:     org_gamekit_jni_GameKitJNI
  * Method:    sendMessage
@@ -421,6 +428,12 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved)
 			"(IFFF)V",
 			(void *) sendSensor
 		},
+		{
+			"sendStylus",
+				"(IFFFFF)V",
+				(void *) sendStylus
+		},
+
 		{
 			"sendMessage",
 			"(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",

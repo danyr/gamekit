@@ -107,11 +107,48 @@ public:
     Vector3 mTempState;
 };
 
+
+class AndroidStylus3D : public JoyStick
+{
+public:
+	AndroidStylus3D(InputManager* creator, bool buffered);
+	virtual ~AndroidStylus3D();
+
+	/** @copydoc Object::setBuffered */
+	virtual void setBuffered(bool buffered);
+
+	virtual Vector3 getStylus3DPosition(void) { return mState.mVectors[0]; }
+	/** @copydoc Object::capture */
+	virtual void capture();
+
+	/** @copydoc Object::queryInterface */
+	virtual Interface* queryInterface(Interface::IType type) {return 0;}
+
+	/** @copydoc Object::_initialize */
+	virtual void _initialize();
+
+
+	void injectStylusEvent(float x,float y,float z,float axisAngle,float stylusAngle);
+
+protected:
+	class StylusData {
+	public:
+		float x;
+		float y;
+		float z;
+		float axisAngle; // rotation angle for stylus
+		float stylusAngle; // stylus angle relative to the input panel
+	};
+	StylusData mTempState;
+};
+
+
 class AndroidInputManager : public InputManager, public FactoryCreator
 {
 	AndroidMultiTouch* mTouch;
 	AndroidKeyboard* mKeyboard;
 	AndroidAccelerometer* mAccelerometer;
+	AndroidStylus3D* mStylus;
 
 public:
 	AndroidInputManager();
@@ -133,6 +170,8 @@ public:
 
 	//--
 	void injectAcceleration(float x,float y,float z) {if (mAccelerometer) mAccelerometer->injectAcceleration(x,y,z);}
+	void injectStylusEvent(float x,float y,float z,float axisAngle,float stylusAngle) {
+		if (mStylus) mStylus->injectStylusEvent(x,y,z,axisAngle,stylusAngle);}
 	void injectKey(int action, int uniChar, int keyCode) { if (mKeyboard) mKeyboard->injectKey(action, uniChar, keyCode); }
 	void injectTouch(int action, float x, float y) { if (mTouch) mTouch->injectTouch(action, x, y); }
 	void setOffsets(int x, int y) { if (mTouch) mTouch->setOffsets(x,y); }
