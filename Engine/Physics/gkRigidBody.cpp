@@ -323,7 +323,8 @@ void gkRigidBody::setAngularVelocity(const gkVector3& v, int tspace)
 
 
 	btVector3 nvel = btVector3(vel.x, vel.y, vel.z) * af;
-	if (gkFuzzy(nvel.length2()))
+	//exact zero allows setting the velocity to zero
+	if (nvel.length2()!=0.0 && gkFuzzy(nvel.length2()))
 		return;
 
 	m_body->setAngularVelocity(nvel);
